@@ -22,4 +22,30 @@ def user_dir() -> str:
     return d
 
 
-MY_TERMS_FILE = os.path.join(user_dir(), "my_terms.json")
+def _writable(d: str) -> bool:
+    try:
+        os.makedirs(d, exist_ok=True)
+        probe = os.path.join(d, ".write-test")
+        with open(probe, "w") as fh:
+            fh.write("ok")
+        os.remove(probe)
+        return True
+    except OSError:
+        return False
+
+
+# Portable layout: when the program folder is writable, everything the user creates
+# (downloaded accurate model, my terms) lives inside it, so copying the folder to
+# another computer brings it all along. Otherwise fall back to the user's profile.
+PORTABLE_DATA = os.path.join(APP_DIR, "data")
+PORTABLE = _writable(PORTABLE_DATA)
+DATA_HOME = PORTABLE_DATA if PORTABLE else user_dir()
+
+MY_TERMS_FILE = os.path.join(DATA_HOME, "my_terms.json")
+_legacy_terms = os.path.join(user_dir(), "my_terms.json")
+if PORTABLE and not os.path.exists(MY_TERMS_FILE) and os.path.exists(_legacy_terms):
+    try:
+        import shutil
+        shutil.copyfile(_legacy_terms, MY_TERMS_FILE)
+    except OSError:
+        pass

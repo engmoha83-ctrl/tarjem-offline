@@ -22,15 +22,39 @@ except Exception:
     MODEL = dict(_DEFAULT_MODEL)
 
 
-def models_dir():
+def _legacy_dir():
     base = os.environ.get("LOCALAPPDATA") or paths.user_dir()
-    d = os.path.join(base, "Tarjem", "models")
+    return os.path.join(base, "Tarjem", "models")
+
+
+def models_dir():
+    """Inside the program folder when it is writable (portable), else the user's profile."""
+    d = os.path.join(paths.APP_DIR, "models", "accurate") if paths.PORTABLE else _legacy_dir()
     os.makedirs(d, exist_ok=True)
     return d
 
 
 def model_path():
-    return os.path.join(models_dir(), MODEL["file"])
+    """Where the model is (or will be downloaded to). Finds a copy left in the old location too."""
+    main = os.path.join(models_dir(), MODEL["file"])
+    if os.path.exists(main):
+        return main
+    legacy = os.path.join(_legacy_dir(), MODEL["file"])
+    if os.path.exists(legacy):
+        return legacy
+    return main
+
+
+def move_into_program_folder():
+    """Move a model downloaded by an older version (user profile) next to the program."""
+    src = os.path.join(_legacy_dir(), MODEL["file"])
+    dst = os.path.join(models_dir(), MODEL["file"])
+    if paths.PORTABLE and os.path.exists(src) and not os.path.exists(dst):
+        import shutil
+        try:
+            shutil.move(src, dst)
+        except OSError:
+            pass
 
 
 def server_candidates():
@@ -65,7 +89,7 @@ class Accurate:
     def status(self):
         return {"state": self.state, "progress": round(self.progress, 3), "error": self.error,
                 "device": self.device, "name": MODEL["name"], "size_gb": round(MODEL["bytes"] / 1e9, 1),
-                "path": model_path()}
+                "path": model_path(), "portable": paths.PORTABLE, "app_dir": paths.APP_DIR}
 
     # ---------- download (one time, needs internet) ----------
     def download(self):
@@ -76,7 +100,7 @@ class Accurate:
         return self.status()
 
     def _download(self):
-        dst = model_path()
+        dst = os.path.join(models_dir(), MODEL["file"])
         part = dst + ".part"
         try:
             have = os.path.getsize(part) if os.path.exists(part) else 0
@@ -110,8 +134,10 @@ class Accurate:
             return {"error": "اختار ملف .gguf"}
         import shutil
         self.stop()
-        shutil.copyfile(path, model_path())
-        MODEL["bytes"] = os.path.getsize(model_path())
+        dst = os.path.join(models_dir(), MODEL["file"])
+        if os.path.abspath(path) != os.path.abspath(dst):
+            shutil.copyfile(path, dst)
+        MODEL["bytes"] = os.path.getsize(dst)
         self.state = "idle"
         self.start()
         return self.status()
@@ -128,6 +154,7 @@ class Accurate:
         return self.status()
 
     def _start(self):
+        move_into_program_folder()
         log = os.path.join(paths.user_dir(), "llama-server.log")
         last = "llama.cpp غير موجود في البرنامج"
         for exe, ngl in server_candidates():

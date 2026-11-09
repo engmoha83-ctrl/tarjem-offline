@@ -195,7 +195,7 @@ body{font-family:"Segoe UI","Tahoma","IBM Plex Sans Arabic",system-ui,sans-serif
   </section>
 
   <section class="view" id="v-mine">
-    <p class="hint" style="margin-top:0">ضيف المصطلحات الخاصة بشغلك (أسماء مشاريع، مسميات داخلية، ترجمات بتفضّلها). مصطلحاتك ليها الأولوية في الترجمة على القاموس العام، ومتخزنة على جهازك.</p>
+    <p class="hint" style="margin-top:0">ضيف المصطلحات الخاصة بشغلك (أسماء مشاريع، مسميات داخلية، ترجمات بتفضّلها). مصطلحاتك ليها الأولوية في الترجمة على القاموس العام، ومتخزنة جوه فولدر البرنامج (data\my_terms.json) فبتتنقل معاه. <a href="#" id="openFolder">افتح فولدر البرنامج</a></p>
     <form class="mine-form" id="mineForm">
       <input type="text" name="ar" placeholder="المصطلح بالعربي" required>
       <input type="text" name="en" placeholder="English term" required>
@@ -392,7 +392,8 @@ function renderAcc(st){
   $("#accDl").hidden = s !== "missing";
   $("#accFile").hidden = s !== "missing";
   const size = ACC.size_gb ? ACC.size_gb + " جيجا" : "";
-  if (s === "missing") t.innerHTML = `<b>الوضع الدقيق محتاج تحميل الموديل مرة واحدة (${size})</b>بعد كده بيشتغل من غير نت. التحميل محتاج إنترنت، ولو اتقطع هيكمل من مكانه.` + (ACC.error ? `<div class="note">${esc(ACC.error)}</div>` : "");
+  const where = ACC.portable ? "الموديل هيتحفظ جوه فولدر البرنامج، فلو نقلت الفولدر لجهاز تاني مش هتحتاج تحمّله تاني." : "فولدر البرنامج مقفول للكتابة، فالموديل هيتحفظ في فولدر المستخدم.";
+  if (s === "missing") t.innerHTML = `<b>الوضع الدقيق محتاج تحميل الموديل مرة واحدة (${size})</b>بعد كده بيشتغل من غير نت. التحميل محتاج إنترنت، ولو اتقطع هيكمل من مكانه. ${where}` + (ACC.error ? `<div class="note">${esc(ACC.error)}</div>` : "");
   else if (s === "downloading") t.innerHTML = `<b>جاري تحميل الموديل… ${Math.round(ACC.progress*100)}%</b><div class="bar"><i style="width:${ACC.progress*100}%"></i></div>`;
   else if (s === "loading" || s === "idle") t.innerHTML = `<b>جاري تشغيل الموديل الدقيق…</b>أول مرة ممكن تاخد دقيقة.`;
   else if (s === "error") t.innerHTML = `<b>الموديل الدقيق ما اشتغلش</b><div class="note">${esc(ACC.error || "")}</div>`;
@@ -472,6 +473,7 @@ function renderDict(reset){
 }
 
 /* ---------- My terms ---------- */
+$("#openFolder").addEventListener("click", e => { e.preventDefault(); if (api) api.open_app_folder(); });
 function renderMine(){
   const list = [...MINE].sort((a,b) => (b.t || 0) - (a.t || 0));
   $("#mlist").innerHTML = list.length ? list.map(m => `

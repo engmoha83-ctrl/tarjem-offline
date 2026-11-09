@@ -18,7 +18,9 @@ SolidCompression=yes
 DiskSpanning=no
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-PrivilegesRequiredOverridesAllowed=dialog
+; Install per user (no admin) so the program folder stays writable and the
+; downloaded model + my terms live next to the program (copy the folder = copy everything).
+PrivilegesRequired=lowest
 WizardStyle=modern
 UninstallDisplayIcon={app}\Tarjem.exe
 

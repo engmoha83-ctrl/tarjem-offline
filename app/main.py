@@ -56,6 +56,13 @@ class Api:
             return self._accurate.status()
         return self._accurate.use_file(res[0])
 
+    def open_app_folder(self):
+        try:
+            os.startfile(paths.APP_DIR)  # Windows only
+            return True
+        except Exception:
+            return False
+
     # --- my terms ---
     def get_terms(self):
         return self._glossary.mine.items
