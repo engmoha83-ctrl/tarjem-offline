@@ -8,7 +8,7 @@ import time
 import urllib.request
 
 STYLE_EN = {
-    "formal": "Formal business correspondence (letters and emails): polite, clear and professional, as used by engineering and contracting companies in Saudi Arabia.",
+    "formal": "Formal business correspondence (letters and emails): polite, clear and professional, as used by engineering and contracting companies in Saudi Arabia. Do not add a greeting or closing unless the source has one.",
     "email": "Rewrite it as a complete, ready-to-send professional English email: first line 'Subject: ...', then greeting, body and a professional closing. Keep every fact, figure, date and reference.",
     "technical": "Precise technical translation, faithful to the source, suitable for reports, specifications and method statements.",
     "literal": "Close translation that keeps the original sentence order as much as natural English allows.",
@@ -38,8 +38,9 @@ def build_messages(text, direction="ar-en", style="formal", terms=()):
         "1. Output ONLY the translation. No notes, explanations, quotes or preamble.",
         "2. Keep numbers, amounts, dates, reference and drawing numbers, names and codes exactly." + (" Use Western digits." if to_en else ""),
         "3. Keep paragraph breaks and numbered lists.",
-        ("4. The source may be colloquial (Egyptian or Saudi dialect) or mixed with English words: translate the intended meaning into correct professional English. On a construction site 'قواعد' means footings, 'سملات' tie beams, 'طوبار/شدة' formwork, 'الحفر' excavation."
-         if to_en else "4. Write correct Modern Standard Arabic."),
+        "4. Never add information that is not in the source: no extra sentences, no attachments, no names, dates or [placeholders].",
+        ("5. The source may be colloquial (Egyptian or Saudi dialect) or mixed with English words: translate the intended meaning into correct professional English. On a construction site 'قواعد' means footings, 'سملات' tie beams, 'طوبار/شدة' formwork, 'الحفر' excavation, 'صب/نصب' pour or cast concrete."
+         if to_en else "5. Write correct Modern Standard Arabic."),
     ]
     return [{"role": "system", "content": "\n".join(lines)}, {"role": "user", "content": text}]
 

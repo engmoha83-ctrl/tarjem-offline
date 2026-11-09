@@ -1,0 +1,7 @@
+{
+  "name": "Gemma 3 4B (Q4_K_M)",
+  "file": "gemma-3-4b-it-Q4_K_M.gguf",
+  "url": "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf",
+  "bytes": 2489000000,
+  "license": "Gemma Terms of Use - https://ai.google.dev/gemma/terms"
+}

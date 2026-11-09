@@ -7,39 +7,66 @@ if __package__ in (None, ""):
     from app import paths
     from app.engine import Engine
     from app.glossary import Glossary
+    from app.accurate import Accurate
 else:
     from . import paths
     from .engine import Engine
     from .glossary import Glossary
+    from .accurate import Accurate
 
 
 class Api:
     def __init__(self):
-        self.glossary = Glossary()
-        self.engine = Engine(self.glossary)
-        self.engine.load_async()
+        self._glossary = Glossary()
+        self._engine = Engine(self._glossary)
+        self._engine.load_async()
+        self._accurate = Accurate(self._glossary)
+        self._window = None
 
     # --- translation ---
     def status(self):
-        return {"ready": self.engine.ready, "error": self.engine.error}
+        return {"ready": self._engine.ready, "error": self._engine.error}
 
     def translate(self, text, direction, enforce=True):
         try:
-            return self.engine.translate(text or "", direction, bool(enforce))
+            return self._engine.translate(text or "", direction, bool(enforce))
         except Exception as e:
             return {"error": f"{type(e).__name__}: {e}"}
 
+    # --- accurate mode (local LLM) ---
+    def acc_status(self):
+        return self._accurate.status()
+
+    def acc_download(self):
+        return self._accurate.download()
+
+    def acc_start(self):
+        return self._accurate.start()
+
+    def acc_translate(self, text, direction, style):
+        return self._accurate.translate(text or "", direction, style)
+
+    def acc_poll(self, job):
+        return self._accurate.poll(job)
+
+    def acc_pick_file(self):
+        import webview
+        res = self._window.create_file_dialog(webview.OPEN_DIALOG, file_types=("GGUF model (*.gguf)",)) if self._window else None
+        if not res:
+            return self._accurate.status()
+        return self._accurate.use_file(res[0])
+
     # --- my terms ---
     def get_terms(self):
-        return self.glossary.mine.items
+        return self._glossary.mine.items
 
     def add_term(self, ar, en, domain):
         if not (ar or "").strip() or not (en or "").strip():
             return {"error": "empty"}
-        return self.glossary.mine.add(ar, en, domain)
+        return self._glossary.mine.add(ar, en, domain)
 
     def delete_term(self, key):
-        self.glossary.mine.delete(key)
+        self._glossary.mine.delete(key)
         return True
 
     # --- clipboard (fallback when the web clipboard is unavailable) ---
@@ -105,12 +132,15 @@ def main():
     unblock_bundle()
     import webview
     api = Api()
-    webview.create_window(
+    api._window = webview.create_window(
         "مُترجم الشغل — أوفلاين",
         url=os.path.join(paths.UI_DIR, "index.html"),
         js_api=api, width=1240, height=860, min_size=(820, 600),
     )
-    webview.start(gui="edgechromium" if sys.platform == "win32" else None)
+    try:
+        webview.start(gui="edgechromium" if sys.platform == "win32" else None)
+    finally:
+        api._accurate.stop()
 
 
 if __name__ == "__main__":

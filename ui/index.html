@@ -105,6 +105,12 @@ body{font-family:"Segoe UI","Tahoma","IBM Plex Sans Arabic",system-ui,sans-serif
 .badge.wait{background:var(--chip);color:var(--muted)}
 .badge.err{background:#fde8e1;color:var(--warn)}
 .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.acc{margin:0 0 12px;background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.acc .txt{flex:1;min-width:240px;font-size:14px}
+.acc .txt b{display:block;margin-bottom:2px}
+.bar{height:8px;background:var(--chip);border-radius:99px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.modehint{font-size:12px;color:var(--muted)}
 </style>
 </head>
 <body>
@@ -128,11 +134,28 @@ body{font-family:"Segoe UI","Tahoma","IBM Plex Sans Arabic",system-ui,sans-serif
 
   <section class="view on" id="v-translate">
     <div class="controls">
+      <div class="seg" id="mode" title="سريع: موديل ترجمة صغير. دقيق: موديل لغوي يفهم السياق والأسلوب.">
+        <button class="on" data-mode="fast">سريع</button>
+        <button data-mode="accurate">دقيق</button>
+      </div>
       <div class="seg" id="dir">
         <button class="on" data-dir="ar-en">عربي ← English</button>
         <button data-dir="en-ar">English ← عربي</button>
       </div>
+      <label class="lbl" id="styleWrap" hidden>الأسلوب
+        <select id="style">
+          <option value="formal">مراسلات رسمية</option>
+          <option value="email">إيميل جاهز للإرسال</option>
+          <option value="technical">تقني دقيق</option>
+          <option value="literal">قريب من الأصل</option>
+        </select>
+      </label>
       <label class="check" id="enforceWrap"><input type="checkbox" id="enforce" checked> إلزام الترجمة بالمصطلحات المعتمدة</label>
+    </div>
+    <div class="acc" id="accBox" hidden>
+      <div class="txt" id="accTxt"></div>
+      <button class="btn" id="accDl" hidden>تحميل الموديل الدقيق</button>
+      <button class="btn ghost" id="accFile" hidden>عندي ملف الموديل</button>
     </div>
     <div class="panes">
       <div class="pane">
@@ -231,6 +254,7 @@ function onApi(){
   api = window.pywebview.api;
   api.get_terms().then(items => { MINE = items || []; renderStats(); renderMine(); });
   pollEngine();
+  api.acc_status().then(st => { ACC = st; });
 }
 if (window.pywebview && window.pywebview.api) onApi();
 else window.addEventListener("pywebviewready", onApi);
@@ -277,7 +301,7 @@ $("#dir").addEventListener("click", e => {
   DIR = b.dataset.dir;
   document.querySelectorAll("#dir button").forEach(x => x.classList.toggle("on", x === b));
   const src = $("#src");
-  $("#enforceWrap").hidden = DIR !== "ar-en";
+  $("#enforceWrap").hidden = DIR !== "ar-en" || MODE === "accurate";
   if (DIR === "ar-en") { src.dir = "rtl"; $("#srcLabel").textContent = "النص العربي"; $("#dstLabel").textContent = "English"; $("#out").classList.add("ltr"); src.placeholder = "اكتب أو الصق النص هنا… (خطاب، إيميل، تقرير، محضر اجتماع)"; }
   else { src.dir = "ltr"; $("#srcLabel").textContent = "English text"; $("#dstLabel").textContent = "العربية"; $("#out").classList.remove("ltr"); src.placeholder = "Type or paste English text here…"; }
 });
@@ -288,12 +312,12 @@ $("#clear").addEventListener("click", () => { $("#src").value = ""; $("#count").
 const out = $("#out");
 const setStatus = s => { $("#status").textContent = s; };
 let runId = 0;
-function chunks(text){
+function chunks(text, limit = 900){
   const paras = text.replace(/\r\n/g, "\n").split("\n");
   const res = []; let buf = [];
   let size = 0;
   for (const p of paras) {
-    if (size + p.length > 900 && buf.length) { res.push(buf.join("\n")); buf = []; size = 0; }
+    if (size + p.length > limit && buf.length) { res.push(buf.join("\n")); buf = []; size = 0; }
     buf.push(p); size += p.length + 1;
   }
   if (buf.length) res.push(buf.join("\n"));
@@ -302,6 +326,7 @@ function chunks(text){
 async function translate(){
   const text = $("#src").value.trim();
   if (!text) { $("#src").focus(); return; }
+  if (MODE === "accurate") return translateAccurate(text);
   if (!api || !engineReady) { setStatus("الموديل لسه بيتحمّل… ثواني"); return; }
   const id = ++runId;
   const enforce = $("#enforce").checked;
@@ -336,6 +361,73 @@ function renderUsed(terms){
   if (!terms.length) { box.hidden = true; return; }
   box.hidden = false;
   $("#used").innerHTML = terms.map(t => `<span class="chip">${esc(t.ar)} <span class="en">${esc(t.en)}</span></span>`).join("");
+}
+
+
+/* ---------- Accurate mode (local LLM) ---------- */
+let MODE = "fast", ACC = {state: "missing"}, accTimer = null;
+$("#mode").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  MODE = b.dataset.mode;
+  document.querySelectorAll("#mode button").forEach(x => x.classList.toggle("on", x === b));
+  $("#styleWrap").hidden = MODE !== "accurate";
+  $("#enforceWrap").hidden = MODE === "accurate" || DIR !== "ar-en";
+  if (MODE === "accurate" && api) { if (ACC.state === "idle") api.acc_start().then(renderAcc); pollAcc(); }
+  renderAcc(ACC);
+});
+function pollAcc(){
+  clearTimeout(accTimer);
+  if (!api) return;
+  api.acc_status().then(st => {
+    renderAcc(st);
+    if (["downloading","loading"].includes(st.state)) accTimer = setTimeout(pollAcc, 700);
+  });
+}
+function renderAcc(st){
+  ACC = st || ACC;
+  const box = $("#accBox"), t = $("#accTxt");
+  if (MODE !== "accurate") { box.hidden = true; return; }
+  const s = ACC.state;
+  box.hidden = s === "ready";
+  $("#accDl").hidden = s !== "missing";
+  $("#accFile").hidden = s !== "missing";
+  const size = ACC.size_gb ? ACC.size_gb + " جيجا" : "";
+  if (s === "missing") t.innerHTML = `<b>الوضع الدقيق محتاج تحميل الموديل مرة واحدة (${size})</b>بعد كده بيشتغل من غير نت. التحميل محتاج إنترنت، ولو اتقطع هيكمل من مكانه.` + (ACC.error ? `<div class="note">${esc(ACC.error)}</div>` : "");
+  else if (s === "downloading") t.innerHTML = `<b>جاري تحميل الموديل… ${Math.round(ACC.progress*100)}%</b><div class="bar"><i style="width:${ACC.progress*100}%"></i></div>`;
+  else if (s === "loading" || s === "idle") t.innerHTML = `<b>جاري تشغيل الموديل الدقيق…</b>أول مرة ممكن تاخد دقيقة.`;
+  else if (s === "error") t.innerHTML = `<b>الموديل الدقيق ما اشتغلش</b><div class="note">${esc(ACC.error || "")}</div>`;
+  const badge = $("#engine");
+  if (s === "ready") { badge.className = "badge"; badge.innerHTML = `<span class="dot"></span>دقيق — جاهز (${esc(ACC.device || "")})`; }
+  else if (engineReady) { badge.className = "badge"; badge.innerHTML = '<span class="dot"></span>جاهز — أوفلاين'; }
+}
+$("#accDl").addEventListener("click", () => api.acc_download().then(st => { renderAcc(st); pollAcc(); }));
+$("#accFile").addEventListener("click", () => api.acc_pick_file().then(st => { renderAcc(st); pollAcc(); }));
+
+async function translateAccurate(text){
+  if (ACC.state !== "ready") { renderAcc(ACC); setStatus("الموديل الدقيق مش جاهز"); return; }
+  const id = ++runId;
+  const parts = chunks(text, 1800);
+  const done = []; const used = new Map();
+  $("#go").setAttribute("aria-disabled","true"); $("#stop").hidden = false;
+  out.innerHTML = '<span class="ph">بيفكّر…</span>';
+  const t0 = performance.now();
+  for (let i = 0; i < parts.length; i++) {
+    if (id !== runId) return;
+    setStatus(parts.length > 1 ? `جزء ${i+1} من ${parts.length}…` : "بيترجم…");
+    const r = await api.acc_translate(parts[i], DIR, $("#style").value);
+    if (r.error) { setStatus("حصل خطأ"); out.textContent = "⚠ " + r.error; break; }
+    for (const t of r.terms) used.set(t.ar + "|" + t.en, t);
+    renderUsed([...used.values()]);
+    while (true) {
+      await new Promise(res => setTimeout(res, 250));
+      const p = await api.acc_poll(r.job);
+      if (id !== runId) return;
+      out.textContent = done.concat(p.text ? [p.text] : []).join("\n\n") || "…";
+      if (p.done) { if (p.error) { setStatus("حصل خطأ"); out.textContent += "\n⚠ " + p.error; } done.push(p.text || ""); break; }
+    }
+  }
+  setStatus(`تم ✓ (${((performance.now() - t0)/1000).toFixed(1)} ث)`);
+  $("#go").removeAttribute("aria-disabled"); $("#stop").hidden = true;
 }
 
 /* ---------- Dictionary ---------- */

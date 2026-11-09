@@ -75,7 +75,9 @@ class Accurate:
             with urllib.request.urlopen(req, timeout=60) as r:
                 if have and r.status != 206:
                     have = 0  # server ignored the range: start over
-                total = MODEL["bytes"]
+                clen = int(r.headers.get("Content-Length") or 0)
+                total = (have + clen) if clen else MODEL["bytes"]
+                MODEL["bytes"] = total
                 with open(part, "ab" if have else "wb") as fh:
                     done = have
                     while True:
@@ -85,7 +87,7 @@ class Accurate:
                         fh.write(chunk)
                         done += len(chunk)
                         self.progress = min(done / total, 1.0)
-            if os.path.getsize(part) < MODEL["bytes"] * 0.98:
+            if os.path.getsize(part) < total:
                 raise IOError("التحميل اتقطع — دوس تحميل تاني وهيكمل من مكانه")
             os.replace(part, dst)
             self.state = "idle"

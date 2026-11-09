@@ -42,6 +42,44 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt pyinstaller
 
+      - name: Get llama.cpp for Windows (Vulkan + CPU)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $rels = gh api "repos/ggml-org/llama.cpp/releases?per_page=30" | ConvertFrom-Json
+          foreach ($kind in @("vulkan", "cpu")) {
+            $pick = $null
+            foreach ($r in $rels) { $a = $r.assets | Where-Object { $_.name -match "bin-win-$kind-x64\.zip$" } | Select-Object -First 1; if ($a) { $pick = @($r.tag_name, $a.name); break } }
+            if (-not $pick) { throw "no llama.cpp win-$kind build found" }
+            Write-Host "llama.cpp $kind -> $($pick[0]) / $($pick[1])"
+            gh release download $pick[0] -R ggml-org/llama.cpp -p $pick[1] -O "$env:RUNNER_TEMP\llama-$kind.zip"
+            Expand-Archive "$env:RUNNER_TEMP\llama-$kind.zip" "$env:RUNNER_TEMP\llama-$kind"
+            $exe = Get-ChildItem -Recurse "$env:RUNNER_TEMP\llama-$kind" -Filter llama-server.exe | Select-Object -First 1
+            New-Item -ItemType Directory -Force "llm\llama-$kind" | Out-Null
+            Copy-Item "$($exe.DirectoryName)\*" "llm\llama-$kind" -Recurse
+            # keep only what the server needs
+            Get-ChildItem "llm\llama-$kind" -Filter *.exe | Where-Object { $_.Name -ne "llama-server.exe" } | Remove-Item
+          }
+          Get-ChildItem -Recurse llm | Measure-Object Length -Sum | ForEach-Object { "llm folder: {0:N0} MB" -f ($_.Sum/1MB) }
+
+      - name: Cache accurate-mode model (test only, not shipped)
+        uses: actions/cache@v4
+        with:
+          path: test-model
+          key: gemma-3-4b-it-Q4_K_M-v1
+
+      - name: Test accurate mode (CPU, real model)
+        run: |
+          if (-not (Test-Path test-model\gemma-3-4b-it-Q4_K_M.gguf)) {
+            New-Item -ItemType Directory -Force test-model | Out-Null
+            $m = Get-Content app\model.json -Raw | ConvertFrom-Json
+            Invoke-WebRequest $m.url -OutFile test-model\gemma-3-4b-it-Q4_K_M.gguf
+          }
+          New-Item -ItemType Directory -Force "$env:RUNNER_TEMP\lad\Tarjem\models" | Out-Null
+          Copy-Item test-model\gemma-3-4b-it-Q4_K_M.gguf "$env:RUNNER_TEMP\lad\Tarjem\models\"
+          $env:LOCALAPPDATA = "$env:RUNNER_TEMP\lad"
+          python scripts/test_accurate.py
+
       - name: Self-test (translate sample sentences)
         run: python -m app.selftest
 
@@ -54,6 +92,7 @@ jobs:
             --exclude-module torch --exclude-module transformers --exclude-module tensorflow `
             app/main.py
           Copy-Item -Recurse models dist/Tarjem/models
+          Copy-Item -Recurse llm dist/Tarjem/llm
           Get-ChildItem dist/Tarjem | Format-Table Name, Length
 
       - name: Smoke-test the packaged Tarjem.exe
