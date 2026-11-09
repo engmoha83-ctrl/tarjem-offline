@@ -1,0 +1,4 @@
+ctranslate2>=4.4,<5
+sentencepiece>=0.2
+pywebview>=5.1
+pyperclip>=1.9
