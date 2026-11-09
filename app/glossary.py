@@ -27,7 +27,7 @@ def _word_pattern(word: str, first: bool) -> str:
         w = w[2:]
     body = _DIAC.join(_CHAR_CLASS.get(c, re.escape(c)) for c in w)
     if first:
-        prefix = "(?:[وفبكل]?ال|لل|[وف])?"
+        prefix = "(?:[وف]?[بكل]?ال|[وف]?لل|[وف]?[بكل]|[وف])?"
     else:
         prefix = "(?:ال|لل|[وفبكل]ال)?"
     return prefix + body + _DIAC
@@ -133,7 +133,7 @@ class Glossary:
             # Short single generic words (عقد، رد، موعد…) are only listed, not forced:
             # injecting them mid-sentence hurts the translation more than it helps.
             if direction == "ar-en":
-                force = t.mine or " " in _strip(t.ar_main).strip() or src_key(t) >= 6
+                force = t.mine or t.domain == "site" or " " in _strip(t.ar_main).strip() or src_key(t) >= 6
             else:
                 force = t.mine or " " in t.en_main
             hit = False
