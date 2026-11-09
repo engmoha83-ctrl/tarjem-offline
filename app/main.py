@@ -54,7 +54,21 @@ class Api:
 
 def selftest(out_path):
     """Used by the build to check the packaged .exe really loads the models."""
+    try:
+        return _selftest(out_path)
+    except BaseException:
+        import traceback
+        with open(out_path, "w", encoding="utf-8") as fh:
+            fh.write("FAIL\n" + traceback.format_exc())
+        return 1
+
+
+def _selftest(out_path):
+    unblock_bundle()
     import webview  # noqa: F401  (make sure the GUI library is bundled too)
+    if sys.platform == "win32":
+        import clr  # noqa: F401  (the .NET bridge the window needs; fails if Python.Runtime.dll can't load)
+        from webview.platforms import winforms  # noqa: F401
     g = Glossary()
     e = Engine(g)
     e.load()
@@ -67,9 +81,28 @@ def selftest(out_path):
     return 0
 
 
+def unblock_bundle():
+    """Remove Windows' "downloaded from the internet" mark from our own files.
+
+    When the portable zip is extracted with Explorer, every file inherits a
+    Zone.Identifier stream, and .NET then refuses to load Python.Runtime.dll
+    ("Failed to resolve Python.Runtime.Loader.Initialize").
+    """
+    if sys.platform != "win32" or not paths.FROZEN or os.environ.get("TARJEM_NO_UNBLOCK"):
+        return
+    for root, _dirs, files in os.walk(paths.RES_DIR):
+        for f in files:
+            if f.lower().endswith((".dll", ".exe", ".pyd")):
+                try:
+                    os.remove(os.path.join(root, f) + ":Zone.Identifier")
+                except OSError:
+                    pass
+
+
 def main():
     if len(sys.argv) > 2 and sys.argv[1] == "--selftest":
         sys.exit(selftest(sys.argv[2]))
+    unblock_bundle()
     import webview
     api = Api()
     webview.create_window(

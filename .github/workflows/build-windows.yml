@@ -50,6 +50,7 @@ jobs:
           pyinstaller --noconfirm --clean --windowed --name Tarjem `
             --add-data "ui;ui" `
             --collect-all ctranslate2 --collect-all sentencepiece --collect-all webview `
+            --collect-all pythonnet --collect-all clr_loader `
             --exclude-module torch --exclude-module transformers --exclude-module tensorflow `
             app/main.py
           Copy-Item -Recurse models dist/Tarjem/models
@@ -57,6 +58,15 @@ jobs:
 
       - name: Smoke-test the packaged Tarjem.exe
         run: |
+          # Simulate a zip downloaded from the internet: mark every DLL like Explorer does
+          Get-ChildItem -Recurse dist\Tarjem -Include *.dll | ForEach-Object { Set-Content -Path $_.FullName -Stream Zone.Identifier -Value "[ZoneTransfer]`r`nZoneId=3" }
+          # Diagnostic: without the fix this is expected to fail like the user's machine did
+          $env:TARJEM_NO_UNBLOCK = "1"
+          $d = "$env:RUNNER_TEMP\exe-selftest-noblock.txt"
+          $q = Start-Process -FilePath "dist\Tarjem\Tarjem.exe" -ArgumentList "--selftest", $d -Wait -PassThru
+          Write-Host "--- without unblock (exit $($q.ExitCode)) ---"; Get-Content $d -Encoding utf8 -ErrorAction SilentlyContinue
+          Remove-Item Env:TARJEM_NO_UNBLOCK
+          Write-Host "--- with unblock ---"
           $out = "$env:RUNNER_TEMP\exe-selftest.txt"
           $p = Start-Process -FilePath "dist\Tarjem\Tarjem.exe" -ArgumentList "--selftest", $out -Wait -PassThru
           Get-Content $out -Encoding utf8
