@@ -89,10 +89,10 @@ class Engine:
         text = text.replace("\r\n", "\n")
         if direction == "ar-en":
             text = text.translate(AR_DIGITS)
-        if enforce:
-            text, used = self.glossary.enforce(text, direction)
-        else:
-            used = self.glossary.find(text, direction)
+        # Glossary terms are only injected into Arabic sources: the en-ar model has no
+        # Arabic in its source vocabulary, so injected terms come out as unknown tokens.
+        inject = enforce and direction == "ar-en"
+        used = self.glossary.find(text, direction)
 
         lines = text.split("\n")
         plan, flat = [], []
@@ -107,7 +107,19 @@ class Engine:
             flat.extend(segs)
 
         with self._lock:
-            done = model.translate(flat) if flat else []
+            plain = model.translate(flat) if flat else []
+            if inject and flat:
+                forced_src = [self.glossary.enforce(s, direction)[0] for s in flat]
+                idx = [i for i, (a, b) in enumerate(zip(flat, forced_src)) if a != b]
+                forced = model.translate([forced_src[i] for i in idx]) if idx else []
+                done = list(plain)
+                for i, f in zip(idx, forced):
+                    # Keep the glossary version unless it visibly dropped content
+                    # (injection occasionally makes the model skip part of the sentence).
+                    if len(f.split()) >= 0.8 * len(plain[i].split()):
+                        done[i] = f
+            else:
+                done = plain
 
         out_lines = []
         for p in plan:

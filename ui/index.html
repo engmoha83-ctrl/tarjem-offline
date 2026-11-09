@@ -131,7 +131,7 @@ body{font-family:"Segoe UI","Tahoma","IBM Plex Sans Arabic",system-ui,sans-serif
         <button class="on" data-dir="ar-en">عربي ← English</button>
         <button data-dir="en-ar">English ← عربي</button>
       </div>
-      <label class="check"><input type="checkbox" id="enforce" checked> إلزام الترجمة بالمصطلحات المعتمدة</label>
+      <label class="check" id="enforceWrap"><input type="checkbox" id="enforce" checked> إلزام الترجمة بالمصطلحات المعتمدة</label>
     </div>
     <div class="panes">
       <div class="pane">
@@ -157,7 +157,7 @@ body{font-family:"Segoe UI","Tahoma","IBM Plex Sans Arabic",system-ui,sans-serif
       <h3>المصطلحات المعتمدة اللي اتلقت في النص</h3>
       <div class="chips" id="used"></div>
     </div>
-    <p class="hint" style="margin-top:14px">نصيحة: الترجمة الأوفلاين بتطلع أحسن مع الجمل الكاملة والواضحة بالفصحى. راجع الأرقام والأسماء قبل الإرسال.</p>
+    <p class="hint" style="margin-top:14px">نصيحة: اكتب بالفصحى وبجمل كاملة. الموديل الأوفلاين ممكن يغلط جامد مع العامية، فراجع الترجمة والأرقام والأسماء قبل الإرسال.</p>
   </section>
 
   <section class="view" id="v-dict">
@@ -276,6 +276,7 @@ $("#dir").addEventListener("click", e => {
   DIR = b.dataset.dir;
   document.querySelectorAll("#dir button").forEach(x => x.classList.toggle("on", x === b));
   const src = $("#src");
+  $("#enforceWrap").hidden = DIR !== "ar-en";
   if (DIR === "ar-en") { src.dir = "rtl"; $("#srcLabel").textContent = "النص العربي"; $("#dstLabel").textContent = "English"; $("#out").classList.add("ltr"); src.placeholder = "اكتب أو الصق النص هنا… (خطاب، إيميل، تقرير، محضر اجتماع)"; }
   else { src.dir = "ltr"; $("#srcLabel").textContent = "English text"; $("#dstLabel").textContent = "العربية"; $("#out").classList.remove("ltr"); src.placeholder = "Type or paste English text here…"; }
 });

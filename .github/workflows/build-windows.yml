@@ -54,10 +54,12 @@ jobs:
           Copy-Item -Recurse models dist/Tarjem/models
           Get-ChildItem dist/Tarjem | Format-Table Name, Length
 
-      - name: Smoke-test the built app's engine
+      - name: Smoke-test the packaged Tarjem.exe
         run: |
-          $env:TARJEM_MODELS = "$PWD\dist\Tarjem\models"
-          python -c "from app.engine import Engine; from app.glossary import Glossary; e=Engine(Glossary()); e.load(); print(e.error or e.translate('تم اعتماد جدول الكميات.', 'ar-en')['text'])"
+          $out = "$env:RUNNER_TEMP\exe-selftest.txt"
+          $p = Start-Process -FilePath "dist\Tarjem\Tarjem.exe" -ArgumentList "--selftest", $out -Wait -PassThru
+          Get-Content $out -Encoding utf8
+          if ($p.ExitCode -ne 0) { throw "Tarjem.exe self-test failed ($($p.ExitCode))" }
 
       - name: Build installer (Inno Setup)
         run: |

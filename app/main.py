@@ -52,7 +52,24 @@ class Api:
             return False
 
 
+def selftest(out_path):
+    """Used by the build to check the packaged .exe really loads the models."""
+    import webview  # noqa: F401  (make sure the GUI library is bundled too)
+    g = Glossary()
+    e = Engine(g)
+    e.load()
+    with open(out_path, "w", encoding="utf-8") as fh:
+        if not e.ready:
+            fh.write("FAIL " + str(e.error))
+            return 1
+        fh.write("OK ar-en: " + e.translate("تم اعتماد جدول الكميات والمخططات التنفيذية.", "ar-en")["text"] + "\n")
+        fh.write("OK en-ar: " + e.translate("The shop drawings were approved.", "en-ar")["text"] + "\n")
+    return 0
+
+
 def main():
+    if len(sys.argv) > 2 and sys.argv[1] == "--selftest":
+        sys.exit(selftest(sys.argv[2]))
     import webview
     api = Api()
     webview.create_window(
