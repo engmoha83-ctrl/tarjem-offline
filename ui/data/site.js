@@ -46,7 +46,6 @@
 أعمال الحفر|excavation works
 الحفر|excavation
 حفر وردم|excavation and backfilling
-خرسانة عادية تحت القواعد|plain concrete (blinding) under the footings
 زلط|gravel / coarse aggregate
 بحص|gravel
 ركام|aggregate
