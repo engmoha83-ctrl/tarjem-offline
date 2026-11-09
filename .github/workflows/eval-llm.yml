@@ -25,14 +25,20 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api repos/ggml-org/llama.cpp/releases/latest --jq '.tag_name, (.assets[].name)' | tee assets.txt
-          name=$(grep -E 'bin-ubuntu-x64\.(tar\.gz|zip)$' assets.txt | head -1)
-          [ -z "$name" ] && name=$(grep -E 'ubuntu' assets.txt | grep -vE 'vulkan|rocm|openvino|sycl|arm64|s390x' | head -1)
-          tag=$(head -1 assets.txt)
-          echo "using $tag / $name"
+          # newest release that actually ships an Ubuntu x64 CPU build
+          gh api "repos/ggml-org/llama.cpp/releases?per_page=30" --jq '.[] | .tag_name as $t | .assets[] | select(.name | test("bin-ubuntu-x64\\.(tar\\.gz|zip)$")) | "\($t) \(.name)"' | head -1 > pick.txt
+          cat pick.txt
           mkdir llama && cd llama
-          gh release download "$tag" -R ggml-org/llama.cpp -p "$name" -O pkg
-          (tar xzf pkg 2>/dev/null || unzip -q pkg)
+          if [ -s ../pick.txt ]; then
+            read tag name < ../pick.txt
+            gh release download "$tag" -R ggml-org/llama.cpp -p "$name" -O pkg
+            (tar xzf pkg 2>/dev/null || unzip -q pkg)
+          else
+            echo "no prebuilt CPU build found - compiling llama-server"
+            git clone --depth 1 https://github.com/ggml-org/llama.cpp src
+            cmake -S src -B build -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DGGML_NATIVE=ON
+            cmake --build build --target llama-server -j 4
+          fi
           find "$PWD" -name llama-server -type f | head -1 > ../server_path
           cat ../server_path
       - run: pip install huggingface_hub
