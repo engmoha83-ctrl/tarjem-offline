@@ -142,6 +142,9 @@ body{font-family:"Segoe UI","Tahoma","IBM Plex Sans Arabic",system-ui,sans-serif
         <button class="on" data-dir="ar-en">عربي ← English</button>
         <button data-dir="en-ar">English ← عربي</button>
       </div>
+      <label class="lbl" id="modelWrap" hidden>الموديل
+        <select id="accModel"></select>
+      </label>
       <label class="lbl" id="styleWrap" hidden>الأسلوب
         <select id="style">
           <option value="formal">مراسلات رسمية</option>
@@ -371,6 +374,7 @@ $("#mode").addEventListener("click", e => {
   MODE = b.dataset.mode;
   document.querySelectorAll("#mode button").forEach(x => x.classList.toggle("on", x === b));
   $("#styleWrap").hidden = MODE !== "accurate";
+  $("#modelWrap").hidden = MODE !== "accurate";
   $("#enforceWrap").hidden = MODE === "accurate" || DIR !== "ar-en";
   if (MODE === "accurate" && api) { if (ACC.state === "idle") api.acc_start().then(renderAcc); pollAcc(); }
   renderAcc(ACC);
@@ -385,6 +389,11 @@ function pollAcc(){
 }
 function renderAcc(st){
   ACC = st || ACC;
+  if (ACC.models) {
+    const sel = $("#accModel");
+    const html = ACC.models.map(m => `<option value="${m.id}" ${m.id === ACC.model ? "selected" : ""}>${esc(m.label)} · ${m.size_gb} جيجا${m.have ? "" : " (مش متحمّل)"}</option>`).join("");
+    if (sel.innerHTML !== html) sel.innerHTML = html;
+  }
   const box = $("#accBox"), t = $("#accTxt");
   if (MODE !== "accurate") { box.hidden = true; return; }
   const s = ACC.state;
@@ -401,6 +410,7 @@ function renderAcc(st){
   if (s === "ready") { badge.className = "badge"; badge.innerHTML = `<span class="dot"></span>دقيق — جاهز (${esc(ACC.device || "")})`; }
   else if (engineReady) { badge.className = "badge"; badge.innerHTML = '<span class="dot"></span>جاهز — أوفلاين'; }
 }
+$("#accModel").addEventListener("change", e => api.acc_choose(e.target.value).then(st => { renderAcc(st); if (st.state === "idle") api.acc_start().then(() => pollAcc()); }));
 $("#accDl").addEventListener("click", () => api.acc_download().then(st => { renderAcc(st); pollAcc(); }));
 $("#accFile").addEventListener("click", () => api.acc_pick_file().then(st => { renderAcc(st); pollAcc(); }));
 

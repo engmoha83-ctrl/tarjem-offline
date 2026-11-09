@@ -37,6 +37,9 @@ class Api:
     def acc_status(self):
         return self._accurate.status()
 
+    def acc_choose(self, mid):
+        return self._accurate.choose(mid)
+
     def acc_download(self):
         return self._accurate.download()
 

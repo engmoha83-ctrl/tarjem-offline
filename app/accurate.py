@@ -10,16 +10,34 @@ from . import paths
 from .llm import LlamaServer, build_messages
 
 # Chosen after evaluating candidates on work sentences (see .github/workflows/eval-llm.yml)
-_DEFAULT_MODEL = {
-    "name": "Gemma 3 4B (Q4_K_M)",
-    "file": "gemma-3-4b-it-Q4_K_M.gguf",
-    "url": "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf",
-    "bytes": 2489000000,
-}
-try:
-    MODEL = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.json"), encoding="utf-8"))
+MODELS = [
+    {"id": "4b", "label": "دقيق (4B)", "name": "Gemma 3 4B (Q4_K_M)",
+     "file": "gemma-3-4b-it-Q4_K_M.gguf",
+     "url": "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf",
+     "bytes": 2489000000},
+    {"id": "12b", "label": "أدق (12B، أبطأ)", "name": "Gemma 3 12B (Q4_K_M)",
+     "file": "gemma-3-12b-it-Q4_K_M.gguf",
+     "url": "https://huggingface.co/unsloth/gemma-3-12b-it-GGUF/resolve/main/gemma-3-12b-it-Q4_K_M.gguf",
+     "bytes": 7300000000},
+]
+try:  # optional override shipped with the build
+    _over = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.json"), encoding="utf-8"))
+    MODELS[0].update({k: v for k, v in _over.items() if k in ("name", "file", "url", "bytes")})
 except Exception:
-    MODEL = dict(_DEFAULT_MODEL)
+    pass
+
+_SETTINGS = os.path.join(paths.DATA_HOME, "settings.json")
+
+
+def _load_choice():
+    try:
+        mid = json.load(open(_SETTINGS, encoding="utf-8")).get("model", "4b")
+    except Exception:
+        mid = "4b"
+    return next((m for m in MODELS if m["id"] == mid), MODELS[0])
+
+
+MODEL = dict(_load_choice())
 
 
 def _legacy_dir():
@@ -84,10 +102,31 @@ class Accurate:
     # ---------- status ----------
     def _model_ok(self):
         p = model_path()
-        return os.path.exists(p) and os.path.getsize(p) >= MODEL["bytes"] * 0.98
+        return os.path.exists(p) and os.path.getsize(p) >= MODEL["bytes"] * 0.95
+
+    def choose(self, mid):
+        """Switch between model sizes; each is downloaded once and kept."""
+        global MODEL
+        m = next((x for x in MODELS if x["id"] == mid), None)
+        if not m or m["id"] == MODEL.get("id"):
+            return self.status()
+        self.stop()
+        MODEL.clear()
+        MODEL.update(m)
+        try:
+            with open(_SETTINGS, "w", encoding="utf-8") as fh:
+                json.dump({"model": mid}, fh)
+        except OSError:
+            pass
+        self.error, self.progress, self.device = None, 0.0, ""
+        self.state = "idle" if self._model_ok() else "missing"
+        return self.status()
 
     def status(self):
-        return {"state": self.state, "progress": round(self.progress, 3), "error": self.error,
+        return {"models": [{"id": m["id"], "label": m["label"], "size_gb": round(m["bytes"] / 1e9, 1),
+                            "have": os.path.exists(os.path.join(models_dir(), m["file"])) or os.path.exists(os.path.join(_legacy_dir(), m["file"]))}
+                           for m in MODELS],
+                "model": MODEL.get("id"),"state": self.state, "progress": round(self.progress, 3), "error": self.error,
                 "device": self.device, "name": MODEL["name"], "size_gb": round(MODEL["bytes"] / 1e9, 1),
                 "path": model_path(), "portable": paths.PORTABLE, "app_dir": paths.APP_DIR}
 
@@ -110,7 +149,6 @@ class Accurate:
                     have = 0  # server ignored the range: start over
                 clen = int(r.headers.get("Content-Length") or 0)
                 total = (have + clen) if clen else MODEL["bytes"]
-                MODEL["bytes"] = total
                 with open(part, "ab" if have else "wb") as fh:
                     done = have
                     while True:

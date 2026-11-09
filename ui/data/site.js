@@ -24,6 +24,8 @@
 صبة النظافة|blinding
 نظافة الأساسات|blinding concrete
 صبة|concrete pour
+هنصب|we will pour the concrete
+هنصب بكرة|we will pour the concrete tomorrow
 طوبار|formwork
 شدة|formwork
 نجارة مسلحة|formwork carpentry
