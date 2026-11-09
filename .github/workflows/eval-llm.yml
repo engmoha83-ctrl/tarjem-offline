@@ -25,11 +25,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          url=$(gh api repos/ggml-org/llama.cpp/releases/latest --jq '.assets[] | select(.name | test("bin-ubuntu-x64\\.(tar\\.gz|zip)$")) | .browser_download_url' | head -1)
-          echo "$url"
-          mkdir llama && cd llama && curl -sL "$url" -o pkg
+          gh api repos/ggml-org/llama.cpp/releases/latest --jq '.tag_name, (.assets[].name)' | tee assets.txt
+          name=$(grep -E 'bin-ubuntu-x64\.(tar\.gz|zip)$' assets.txt | head -1)
+          [ -z "$name" ] && name=$(grep -E 'ubuntu' assets.txt | grep -vE 'vulkan|rocm|openvino|sycl|arm64|s390x' | head -1)
+          tag=$(head -1 assets.txt)
+          echo "using $tag / $name"
+          mkdir llama && cd llama
+          gh release download "$tag" -R ggml-org/llama.cpp -p "$name" -O pkg
           (tar xzf pkg 2>/dev/null || unzip -q pkg)
-          find . -name llama-server -type f | head -1 > ../server_path
+          find "$PWD" -name llama-server -type f | head -1 > ../server_path
           cat ../server_path
       - run: pip install huggingface_hub
       - name: Evaluate
