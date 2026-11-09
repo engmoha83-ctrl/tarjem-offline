@@ -21,7 +21,7 @@ STYLE_AR = {
 }
 
 
-def build_messages(text, direction="ar-en", style="formal", terms=()):
+def build_messages(text, direction="ar-en", style="formal", terms=(), colloquial=()):
     to_en = direction == "ar-en"
     lines = [
         "You are an expert professional translator between Arabic and English. The user works in engineering and "
@@ -34,6 +34,10 @@ def build_messages(text, direction="ar-en", style="formal", terms=()):
         lines.append("Mandatory terminology - when the concept appears, use exactly this equivalent:")
         for t in terms:
             lines.append(f"- {t['ar']} = {t['en']}" if to_en else f"- {t['en']} = {t['ar']}")
+    if colloquial:
+        lines.append("Colloquial Egyptian words in this text and what they mean (use the meaning, translate naturally):")
+        for c in colloquial:
+            lines.append(f"- {c['ar']} = {c['en']}" + (f" (MSA: {c['msa']})" if c.get("msa") else ""))
     lines += [
         "Rules:",
         "1. Output ONLY the translation. No notes, explanations, quotes or preamble.",
@@ -43,7 +47,21 @@ def build_messages(text, direction="ar-en", style="formal", terms=()):
         ("5. The source may be colloquial (Egyptian or Saudi dialect) or mixed with English words: translate the intended meaning into correct, natural English."
          if to_en else "5. Write correct Modern Standard Arabic."),
     ]
-    return [{"role": "system", "content": "\n".join(lines)}, {"role": "user", "content": text}]
+    words = len(text.split())
+    target = "English" if to_en else "Arabic"
+    if words <= 3 and style != "email":
+        task = (f"Translate this short Arabic word or phrase into {target}. Reply with only its meaning in a few words, nothing else."
+                if to_en else f"Translate this short English word or phrase into {target}. Reply with only the translation, nothing else.")
+    else:
+        task = f"Translate the text between <<< and >>> into {target}. Reply with the translation only."
+    user = f"{task}\n\n<<<\n{text}\n>>>"
+    return [{"role": "system", "content": "\n".join(lines)}, {"role": "user", "content": user}]
+
+
+def max_tokens_for(text, style):
+    """Cap the answer length to the source length so the model cannot run away."""
+    base = int(len(text) * 1.3) + 30
+    return min(4000, base + (400 if style == "email" else 0))
 
 
 def msa_messages(text):

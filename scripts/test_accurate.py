@@ -20,6 +20,9 @@ if a.state != "ready":
         print(open(log, encoding="utf-8", errors="replace").read()[-4000:])
     sys.exit(1)
 for text, d, style in [
+    ("نط", "ar-en", "formal"),
+    ("نط من القطر على طول", "ar-en", "formal"),
+    ("الصبة اتأجلت عشان الخلاطة عطلانة", "ar-en", "formal"),
     ("الآن جاري أعمال الحفر وبعد الانتهاء منها سنصب الخرسانة العادية تحت القواعد", "ar-en", "formal"),
     ("عايزين نبلغ الاستشاري إن المستخلص رقم 7 اتأخر شهرين ومحتاجين يتصرف بسرعة", "ar-en", "email"),
     ("The shop drawings for the ground floor footings were approved.", "en-ar", "formal"),
@@ -33,4 +36,6 @@ for text, d, style in [
     print(f"[{d} {style} {p.get('secs')}s] {text}\n -> {p['text']}\n")
     if p.get("error") or not p["text"].strip():
         sys.exit(1)
+    if len(text.split()) <= 3 and len(p["text"].split()) > 12:
+        print("RUNAWAY OUTPUT for a short input"); sys.exit(1)
 a.stop()

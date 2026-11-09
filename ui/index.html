@@ -11,6 +11,7 @@
 <script src="data/admin.js"></script>
 <script src="data/finance.js"></script>
 <script src="data/site.js"></script>
+<script src="data/egyptian.js"></script>
 <style>
 :root{
   --bg:#f5f3ee; --panel:#ffffff; --ink:#1d2433; --muted:#6b7280; --line:#e4e0d6;
@@ -237,7 +238,7 @@ const BUILTIN = [];
 for (const d of (window.GL || [])) for (const line of d.terms.split("\n")) {
   const t = line.trim(); if (!t) continue;
   const [ar, en, abbr] = t.split("|").map(x => (x||"").trim());
-  if (ar && en) BUILTIN.push(makeTerm(ar, en, abbr || "", d.id, false));
+  if (ar && en) { const t = makeTerm(ar, en, d.id === "egy" ? "" : (abbr || ""), d.id, false); if (d.id === "egy") t.msa = abbr || ""; BUILTIN.push(t); }
 }
 function makeTerm(ar, en, abbr, domain, mine){
   return { ar, en, abbr, domain, mine,
@@ -474,7 +475,7 @@ function renderDict(reset){
   $("#dlist").innerHTML = shown.length ? shown.map((t, i) => `
     <div class="row">
       <div class="ar">${esc(t.ar)}</div>
-      <div class="en">${esc(t.en)}${t.abbr ? `<span class="abbr">${esc(t.abbr)}</span>` : ""}<button class="cp" data-i="${i}">نسخ</button></div>
+      <div class="en">${esc(t.en)}${t.abbr ? `<span class="abbr">${esc(t.abbr)}</span>` : ""}${t.msa ? `<span class="abbr" dir="rtl">فصحى: ${esc(t.msa)}</span>` : ""}<button class="cp" data-i="${i}">نسخ</button></div>
       <div class="tag">${esc(domName(t.mine ? "mine" : t.domain))}</div>
     </div>`).join("") : `<div class="empty">مفيش نتائج${raw ? " لـ «" + esc(raw) + "»" : ""}. لو المصطلح مهم ليك، ضيفه من «مصطلحاتي».</div>`;
   $("#dlist").onclick = e => { const b = e.target.closest(".cp"); if (b) copyText(shown[+b.dataset.i].enMain); };

@@ -7,7 +7,7 @@ import urllib.request
 import uuid
 
 from . import paths
-from .llm import LlamaServer, build_messages
+from .llm import LlamaServer, build_messages, max_tokens_for
 
 # Chosen after evaluating candidates on work sentences (see .github/workflows/eval-llm.yml)
 MODELS = [
@@ -57,9 +57,9 @@ def model_path():
     main = os.path.join(models_dir(), MODEL["file"])
     if os.path.exists(main):
         return main
-    legacy = os.path.join(_legacy_dir(), MODEL["file"])
-    if os.path.exists(legacy):
-        return legacy
+    for other in (os.path.join(paths.APP_DIR, "models", MODEL["file"]), os.path.join(_legacy_dir(), MODEL["file"])):
+        if os.path.exists(other):
+            return other
     return main
 
 
@@ -224,21 +224,24 @@ class Accurate:
         if self.state != "ready":
             return {"error": "الموديل الدقيق مش جاهز"}
         jid = uuid.uuid4().hex[:8]
-        job = {"text": "", "done": False, "error": None, "terms": self.glossary.find(text, direction), "t0": time.time()}
+        colloquial = self.glossary.find_colloquial(text) if direction == "ar-en" else []
+        job = {"text": "", "done": False, "error": None, "terms": self.glossary.find(text, direction),
+               "colloquial": colloquial, "t0": time.time()}
         self.jobs[jid] = job
 
         def run():
             try:
                 with self._lock:
-                    msgs = build_messages(text, direction, style, job["terms"])
-                    job["text"] = self.server.chat(msgs, max_tokens=2000, stream_cb=lambda s: job.__setitem__("text", s))
+                    msgs = build_messages(text, direction, style, job["terms"], job["colloquial"])
+                    job["text"] = self.server.chat(msgs, max_tokens=max_tokens_for(text, style),
+                                                   stream_cb=lambda s: job.__setitem__("text", s))
             except Exception as e:
                 job["error"] = f"{type(e).__name__}: {e}"
             job["done"] = True
             job["secs"] = round(time.time() - job["t0"], 1)
 
         threading.Thread(target=run, daemon=True).start()
-        return {"job": jid, "terms": job["terms"]}
+        return {"job": jid, "terms": job["terms"] + [{"ar": c["ar"], "en": c["en"]} for c in colloquial]}
 
     def poll(self, jid):
         j = self.jobs.get(jid)

@@ -92,7 +92,11 @@ class Engine:
         # Glossary terms are only injected into Arabic sources: the en-ar model has no
         # Arabic in its source vocabulary, so injected terms come out as unknown tokens.
         inject = enforce and direction == "ar-en"
-        used = self.glossary.find(text, direction)
+        colloquial = []
+        if direction == "ar-en":
+            colloquial = self.glossary.find_colloquial(text)
+            text = self.glossary.to_msa(text)
+        used = self.glossary.find(text, direction) + [{"ar": c["ar"], "en": c["en"]} for c in colloquial]
 
         lines = text.split("\n")
         plan, flat = [], []

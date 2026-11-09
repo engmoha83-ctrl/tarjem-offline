@@ -41,6 +41,15 @@ def arabic_regex(term: str):
     return re.compile(r"(?<![\w؀-ۿ])" + pat + r"(?![\w؀-ۿ])")
 
 
+def colloquial_regex(term: str):
+    """Match a colloquial word/phrase literally (no ال-stripping), allowing a leading و/ف that is kept."""
+    words = [w for w in re.split(r"\s+", _strip(term).strip()) if w]
+    if not words:
+        return None
+    body = r"\s+".join(_DIAC.join(_CHAR_CLASS.get(c, re.escape(c)) for c in w) + _DIAC for w in words)
+    return re.compile(r"(?<![\w\u0600-\u06FF])(?P<p>[وف])?(?:" + body + r")(?![\w\u0600-\u06FF])")
+
+
 def english_regex(term: str):
     words = [w for w in re.split(r"\s+", term.strip()) if w]
     if not words:
@@ -50,13 +59,17 @@ def english_regex(term: str):
 
 
 class Term:
-    __slots__ = ("ar", "en", "abbr", "domain", "mine", "ar_main", "en_main", "ar_res", "en_res")
+    __slots__ = ("ar", "en", "abbr", "domain", "mine", "ar_main", "en_main", "ar_res", "en_res", "msa")
 
     def __init__(self, ar, en, abbr="", domain="general", mine=False):
         self.ar, self.en, self.abbr, self.domain, self.mine = ar, en, abbr, domain, mine
+        self.msa = ""
+        if domain == "egy":  # third field is the Modern Standard Arabic equivalent, not an abbreviation
+            self.msa, self.abbr = abbr, ""
         self.ar_main = ar.split("/")[0].strip()
         self.en_main = en.split("/")[0].strip()
-        self.ar_res = [arabic_regex(x) for x in ar.split("/") if len(_strip(x).strip()) > 1]
+        make = colloquial_regex if domain == "egy" else arabic_regex
+        self.ar_res = [make(x) for x in ar.split("/") if len(_strip(x).strip()) > 1]
         self.en_res = [english_regex(x) for x in en.split("/") if len(x.strip()) > 1]
         self.ar_res = [r for r in self.ar_res if r]
         self.en_res = [r for r in self.en_res if r]
@@ -113,8 +126,34 @@ class Glossary:
         self.mine = MyTerms()
 
     def all(self):
-        # user terms first so they win over built-in ones
-        return self.mine.terms() + self.builtin
+        # user terms first so they win over built-in ones; colloquial entries are handled separately
+        return [t for t in self.mine.terms() + self.builtin if t.domain != "egy"]
+
+    def colloquial(self):
+        return [t for t in self.builtin if t.domain == "egy"]
+
+    def find_colloquial(self, text):
+        """Colloquial Egyptian words in the text, with meaning and MSA equivalent (longest first)."""
+        hits, taken = [], []
+        for t in sorted(self.colloquial(), key=lambda t: -len(t.ar_main)):
+            for r in t.ar_res:
+                for m in r.finditer(text):
+                    span = m.span()
+                    if any(a < span[1] and span[0] < b for a, b in taken):
+                        continue
+                    taken.append(span)
+                    if not any(h["ar"] == t.ar_main for h in hits):
+                        hits.append({"ar": t.ar_main, "en": t.en_main if "/" not in t.en else t.en, "msa": t.msa})
+        return hits
+
+    def to_msa(self, text):
+        """Replace unambiguous colloquial words with Modern Standard Arabic (keeps a leading و/ف)."""
+        for t in sorted(self.colloquial(), key=lambda t: -len(t.ar_main)):
+            if not t.msa:
+                continue
+            for r in t.ar_res:
+                text = r.sub(lambda m, msa=t.msa: (m.group("p") or "") + msa, text)
+        return text
 
     def enforce(self, text: str, direction: str):
         """Replace glossary terms in the source with their approved target-language form.
