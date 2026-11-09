@@ -13,7 +13,6 @@ jobs:
         model:
           - unsloth/gemma-3-4b-it-GGUF
           - unsloth/gemma-3-12b-it-GGUF
-          - unsloth/Qwen3-8B-GGUF
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -43,4 +42,4 @@ jobs:
       - name: Evaluate
         run: |
           S=$(realpath $(cat server_path)); export LD_LIBRARY_PATH=$(dirname "$S"):$LD_LIBRARY_PATH
-          python scripts/eval_llm.py "$S" "${{ matrix.model }}"
+          python scripts/eval_dialect.py "$S" "${{ matrix.model }}"

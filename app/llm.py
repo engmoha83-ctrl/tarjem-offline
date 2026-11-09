@@ -46,6 +46,17 @@ def build_messages(text, direction="ar-en", style="formal", terms=()):
     return [{"role": "system", "content": "\n".join(lines)}, {"role": "user", "content": text}]
 
 
+def msa_messages(text):
+    """Step 1 of two-step translation: colloquial Arabic -> clear Modern Standard Arabic."""
+    sys_prompt = (
+        "You rewrite colloquial Arabic (Egyptian, Saudi/Gulf or mixed) into clear Modern Standard Arabic. "
+        "Keep the exact meaning, the same people, numbers and details. Do not translate, do not explain, "
+        "do not add anything. If the text is already Modern Standard Arabic, return it unchanged. "
+        "Output ONLY the rewritten Arabic text."
+    )
+    return [{"role": "system", "content": sys_prompt}, {"role": "user", "content": text}]
+
+
 def _free_port():
     s = socket.socket()
     s.bind(("127.0.0.1", 0))
