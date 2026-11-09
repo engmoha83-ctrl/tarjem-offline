@@ -7,12 +7,12 @@ if __package__ in (None, ""):
     from app import paths
     from app.engine import Engine
     from app.glossary import Glossary
-    from app.accurate import Accurate
+    from app.accurate import Accurate, MODEL, server_candidates
 else:
     from . import paths
     from .engine import Engine
     from .glossary import Glossary
-    from .accurate import Accurate
+    from .accurate import Accurate, MODEL, server_candidates
 
 
 class Api:
@@ -105,6 +105,7 @@ def _selftest(out_path):
             return 1
         fh.write("OK ar-en: " + e.translate("تم اعتماد جدول الكميات والمخططات التنفيذية.", "ar-en")["text"] + "\n")
         fh.write("OK en-ar: " + e.translate("The shop drawings were approved.", "en-ar")["text"] + "\n")
+        fh.write(f"OK accurate: model={MODEL['file']} servers={[c[0] for c in server_candidates()]}\n")
     return 0
 
 

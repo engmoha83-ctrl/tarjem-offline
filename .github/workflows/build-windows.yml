@@ -86,7 +86,7 @@ jobs:
       - name: Build executable
         run: |
           pyinstaller --noconfirm --clean --windowed --name Tarjem `
-            --add-data "ui;ui" `
+            --add-data "ui;ui" --add-data "app/model.json;app" `
             --collect-all ctranslate2 --collect-all sentencepiece --collect-all webview `
             --collect-all pythonnet --collect-all clr_loader `
             --exclude-module torch --exclude-module transformers --exclude-module tensorflow `
@@ -102,12 +102,14 @@ jobs:
           # Diagnostic: without the fix this is expected to fail like the user's machine did
           $env:TARJEM_NO_UNBLOCK = "1"
           $d = "$env:RUNNER_TEMP\exe-selftest-noblock.txt"
-          $q = Start-Process -FilePath "dist\Tarjem\Tarjem.exe" -ArgumentList "--selftest", $d -Wait -PassThru
+          $q = Start-Process -FilePath "dist\Tarjem\Tarjem.exe" -ArgumentList "--selftest", $d -PassThru
+          if (-not $q.WaitForExit(120000)) { $q.Kill(); Write-Host "(timed out)" }
           Write-Host "--- without unblock (exit $($q.ExitCode)) ---"; Get-Content $d -Encoding utf8 -ErrorAction SilentlyContinue
           Remove-Item Env:TARJEM_NO_UNBLOCK
           Write-Host "--- with unblock ---"
           $out = "$env:RUNNER_TEMP\exe-selftest.txt"
-          $p = Start-Process -FilePath "dist\Tarjem\Tarjem.exe" -ArgumentList "--selftest", $out -Wait -PassThru
+          $p = Start-Process -FilePath "dist\Tarjem\Tarjem.exe" -ArgumentList "--selftest", $out -PassThru
+          if (-not $p.WaitForExit(180000)) { $p.Kill(); throw "Tarjem.exe self-test hung (an error dialog is probably open)" }
           Get-Content $out -Encoding utf8
           if ($p.ExitCode -ne 0) { throw "Tarjem.exe self-test failed ($($p.ExitCode))" }
 

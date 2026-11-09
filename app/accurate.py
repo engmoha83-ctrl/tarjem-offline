@@ -10,7 +10,16 @@ from . import paths
 from .llm import LlamaServer, build_messages
 
 # Chosen after evaluating candidates on work sentences (see .github/workflows/eval-llm.yml)
-MODEL = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.json"), encoding="utf-8"))
+_DEFAULT_MODEL = {
+    "name": "Gemma 3 4B (Q4_K_M)",
+    "file": "gemma-3-4b-it-Q4_K_M.gguf",
+    "url": "https://huggingface.co/unsloth/gemma-3-4b-it-GGUF/resolve/main/gemma-3-4b-it-Q4_K_M.gguf",
+    "bytes": 2489000000,
+}
+try:
+    MODEL = json.load(open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "model.json"), encoding="utf-8"))
+except Exception:
+    MODEL = dict(_DEFAULT_MODEL)
 
 
 def models_dir():
