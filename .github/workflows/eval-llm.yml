@@ -1,0 +1,38 @@
+name: Evaluate local LLMs
+
+on:
+  workflow_dispatch:
+
+jobs:
+  eval:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        model:
+          - unsloth/Qwen3-4B-Instruct-2507-GGUF
+          - unsloth/Qwen3-8B-GGUF
+          - unsloth/gemma-3-4b-it-GGUF
+          - unsloth/gemma-3-12b-it-GGUF
+          - ALLaM-7B-Instruct-preview GGUF
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Get llama.cpp (CPU build)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url=$(gh api repos/ggml-org/llama.cpp/releases/latest --jq '.assets[] | select(.name | test("bin-ubuntu-x64\\.(tar\\.gz|zip)$")) | .browser_download_url' | head -1)
+          echo "$url"
+          mkdir llama && cd llama && curl -sL "$url" -o pkg
+          (tar xzf pkg 2>/dev/null || unzip -q pkg)
+          find . -name llama-server -type f | head -1 > ../server_path
+          cat ../server_path
+      - run: pip install huggingface_hub
+      - name: Evaluate
+        run: |
+          S=$(realpath $(cat server_path)); export LD_LIBRARY_PATH=$(dirname "$S"):$LD_LIBRARY_PATH
+          python scripts/eval_llm.py "$S" "${{ matrix.model }}"
