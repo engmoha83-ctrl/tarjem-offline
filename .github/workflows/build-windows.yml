@@ -91,7 +91,8 @@ jobs:
             --collect-all pythonnet --collect-all clr_loader `
             --exclude-module torch --exclude-module transformers --exclude-module tensorflow `
             app/main.py
-          Copy-Item -Recurse models dist/Tarjem/models
+          New-Item -ItemType Directory -Force dist/Tarjem/models | Out-Null
+          Copy-Item -Recurse models/ar-en, models/en-ar dist/Tarjem/models/
           Copy-Item -Recurse llm dist/Tarjem/llm
           Get-ChildItem dist/Tarjem | Format-Table Name, Length
 

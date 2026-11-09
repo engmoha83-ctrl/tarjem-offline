@@ -24,8 +24,9 @@ STYLE_AR = {
 def build_messages(text, direction="ar-en", style="formal", terms=()):
     to_en = direction == "ar-en"
     lines = [
-        "You are an expert professional translator between Arabic and English for engineering, construction contracting, "
-        "contracts, project planning, finance and administration in Saudi Arabia.",
+        "You are an expert professional translator between Arabic and English. The user works in engineering and "
+        "construction in Saudi Arabia, but texts can be about anything: translate what the text actually says and "
+        "do not assume a technical meaning unless the context clearly is technical.",
         ("Translate the user's text from Arabic into English." if to_en else "Translate the user's text from English into Arabic."),
         "Style: " + (STYLE_EN if to_en else STYLE_AR).get(style, STYLE_EN["formal"] if to_en else STYLE_AR["formal"]),
     ]
@@ -38,8 +39,8 @@ def build_messages(text, direction="ar-en", style="formal", terms=()):
         "1. Output ONLY the translation. No notes, explanations, quotes or preamble.",
         "2. Keep numbers, amounts, dates, reference and drawing numbers, names and codes exactly." + (" Use Western digits." if to_en else ""),
         "3. Keep paragraph breaks and numbered lists.",
-        "4. Never add information that is not in the source: no extra sentences, no attachments, no names, dates or [placeholders].",
-        ("5. The source may be colloquial (Egyptian or Saudi dialect) or mixed with English words: translate the intended meaning into correct professional English. On a construction site 'قواعد' means footings, 'سملات' tie beams, 'طوبار/شدة' formwork, 'الحفر' excavation, 'صب/نصب' pour or cast concrete."
+        "4. Never add information that is not in the source: no extra sentences, attachments, names, dates, AM/PM, units or [placeholders]. If something is ambiguous, keep it as general as the source.",
+        ("5. The source may be colloquial (Egyptian or Saudi dialect) or mixed with English words: translate the intended meaning into correct, natural English."
          if to_en else "5. Write correct Modern Standard Arabic."),
     ]
     return [{"role": "system", "content": "\n".join(lines)}, {"role": "user", "content": text}]

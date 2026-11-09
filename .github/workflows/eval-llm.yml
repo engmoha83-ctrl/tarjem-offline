@@ -11,11 +11,9 @@ jobs:
       fail-fast: false
       matrix:
         model:
-          - unsloth/Qwen3-4B-Instruct-2507-GGUF
-          - unsloth/Qwen3-8B-GGUF
           - unsloth/gemma-3-4b-it-GGUF
           - unsloth/gemma-3-12b-it-GGUF
-          - ALLaM-7B-Instruct-preview GGUF
+          - unsloth/Qwen3-8B-GGUF
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
