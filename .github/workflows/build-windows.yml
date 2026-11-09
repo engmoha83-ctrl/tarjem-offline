@@ -50,6 +50,7 @@ jobs:
           pyinstaller --noconfirm --clean --windowed --name Tarjem `
             --add-data "ui;ui" `
             --collect-all ctranslate2 --collect-all sentencepiece --collect-all webview `
+            --exclude-module torch --exclude-module transformers --exclude-module tensorflow `
             app/main.py
           Copy-Item -Recurse models dist/Tarjem/models
           Get-ChildItem dist/Tarjem | Format-Table Name, Length
